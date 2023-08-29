@@ -1,0 +1,94 @@
+
+---
+title: "Determining System Information"
+author: "A. Sanchez Meador"
+date: "`r Sys.Date()`"
+output: html_document
+---
+---
+
+## Introduction
+
+This document provides a way to gather and display information about your system's hardware. Specifically, it determines:
+
+- The number of logical and physical processors
+- The total amount of RAM and available RAM
+- The speed of the processor
+
+## Prerequisites
+
+To run this, you'll need the `parallel` library.
+
+```{r}
+library(parallel)
+```
+
+## Determine Number of Processors
+
+Here, we determine both the logical (which includes hyper-threading if available) and physical cores of the processor.
+
+```{r processor-info}
+logical_cores <- detectCores(logical = TRUE)
+physical_cores <- detectCores(logical = FALSE)
+
+cat("Number of logical cores:", logical_cores, "
+")
+cat("Number of physical cores:", physical_cores, "
+")
+```
+
+## Determine RAM Information
+
+Depending on the operating system (Windows vs. Unix-based), the method to determine RAM differs. For Windows, we use the `systeminfo` command, while for Unix-based systems, we read from `/proc/meminfo`.
+
+```{r ram-info}
+if (.Platform$OS.type == "windows") {
+  
+  sysinfo <- system("systeminfo", intern = TRUE)
+  
+  # Extract total RAM from systeminfo output
+  total_ram_line <- grep("Total Physical Memory:", sysinfo, value = TRUE)
+  num_string_total <- gsub(".*?([0-9,]+) MB.*", "\\1", total_ram_line)
+  total_ram <- as.numeric(gsub(",", "", num_string_total)) / 1024  # Convert to GB
+  
+  # Extract available RAM from systeminfo output
+  free_ram_line <- grep("Available Physical Memory:", sysinfo, value = TRUE)
+  num_string_free <- gsub(".*?([0-9,]+) MB.*", "\\1", free_ram_line)
+  free_ram <- as.numeric(gsub(",", "", num_string_free)) / 1024  # Convert to GB
+  
+} else { # Unix-based systems (e.g., Linux, macOS)
+  
+  meminfo <- readLines("/proc/meminfo")
+  total_ram_line <- grep("MemTotal:", meminfo, value = TRUE)
+  free_ram_line <- grep("MemFree:", meminfo, value = TRUE)
+  
+  # Extract the values from the lines
+  total_ram <- as.numeric(gsub(".*?([0-9]+) kB", "\\1", total_ram_line)) / 1024^2  # Convert to GB
+  free_ram <- as.numeric(gsub(".*?([0-9]+) kB", "\\1", free_ram_line)) / 1024^2  # Convert to GB
+  
+}
+
+cat("Total RAM (GB):", total_ram, "\n")
+cat("Available RAM (GB):", free_ram, "\n")
+```
+
+## Determine Processor Speed
+
+Like the RAM information, the method to determine the processor speed is dependent on the operating system.
+
+```{r cpu-speed}
+if (.Platform$OS.type == "windows") {
+  cpu_speed <- system("wmic cpu get MaxClockSpeed", intern=TRUE)[2]
+  cat("Processor speed (MHz):", cpu_speed, "
+")
+} else { # Unix-based systems
+  cpu_speed <- system("sysctl -n hw.cpufrequency", intern=TRUE)
+  cpu_speed <- as.numeric(cpu_speed) / 10^6 # Convert to MHz
+  cat("Processor speed (MHz):", cpu_speed, "
+")
+}
+```
+
+## Conclusion
+
+This document offers a concise way to gather key hardware details about your system. You can easily extend this to include more details as required.
